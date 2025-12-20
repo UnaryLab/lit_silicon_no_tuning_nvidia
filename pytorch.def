@@ -1,0 +1,5 @@
+Bootstrap: docker
+From: nvcr.io/nvidia/pytorch:25.01-py3
+
+%post
+    pip install fire matplotlib click
