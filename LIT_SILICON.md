@@ -1,5 +1,5 @@
 # Lit Silicon Benchmark & Evaluation (AMD)
-> [!WARN]
+> [!NOTE]
 > Artifact in progress...
 
 # Lit Silicon Benchmark & Evaluation (NVIDIA)
@@ -14,7 +14,7 @@ Each step will be annotated with **(local)** or **(remote)** to designate where 
 ### Python virtual environment **(local & remote)**
 
 Create a python virtual environment if you don't have one already.
-This will be used for installing [Chopper](https://github.com/UnaryLab/chopper).
+This will be used for installing Chopper.
 
 #### uv (recommended)
 
@@ -31,7 +31,7 @@ python -m venv .ls_venv
 . .ls_venv/bin/activate
 ```
 
-1) Clone this benchmark and install [Chopper](https://github.com/UnaryLab/chopper) **(local & remote)**
+1) Clone this benchmark and install Chopper **(local & remote)**
 
 ```
 git clone --recursive https://github.com/UnaryLab/lit_silicon.git
@@ -54,18 +54,18 @@ cd ..
 1) Run the benchmark
 
 This benchmark will run pytorch FSDPv2 training with batch size one sequence length 4k (b1s4), b2s4, and b1s8.
-Raw traces will be inside a folder named the hostname, with the batch size and sequence length number as subfolders (i.e., if node `foobar` ran the benchmark, traces are in `foobar/b1s4`, `foobar/b2s4`, and `foobar/b1s8`).
+Raw traces will be inside a folder named the hostname, with the batch size and sequence length number as subfolders (e.g., if node `foobar` ran the benchmark, traces are in `foobar/b1s4`, `foobar/b2s4`, and `foobar/b1s8`).
 
 ```
 ./run_pytorch.sh
 ```
 
-2) Merge traces using [Chopper](https://github.com/UnaryLab/chopper)
+2) Merge traces using Chopper
 
-This convenience script calls [Chopper](https://github.com/UnaryLab/chopper) to aggregate all raw traces into a single pickle file.
+This convenience script calls Chopper to aggregate all raw traces into a single pickle file.
 Pass the directory you would like to merge as an argument (e.g., `hostname/b1s4` to merge batch size one sequence length 4k traces).
 
-> [!WARN]
+> [!WARNING]
 > Do not pass **just** the hostname as the directory. If you did, results from `b1s4`, `b2s4`, and `b1s8` would all be merged together.
 
 ```
@@ -76,7 +76,7 @@ Now, the pickle file will be inside the directory passed and named `ts.pkl` (e.g
 
 ## Visualization **(local)**
 
-1) Copy the pickle to local computer for visualization
+1) Copy the pickle to your local computer for visualization
 
 Copy it any way you'd like, `rsync` is not required.
 
@@ -85,7 +85,7 @@ mkdir nvidia
 rsync -avzh <login_node>:/data/lit_silicon/hostname/bXsX/ts.pkl nvidia/ts.pkl
 ```
 
-2) Open the [Chopper](https://github.com/UnaryLab/chopper) GUI
+2) Open the Chopper GUI
 
 ```
 python -m chopper.window
@@ -93,13 +93,12 @@ python -m chopper.window
 
 3) Select `straggler_per_gpu` under `available plots`
 
-You can ignore data and draw args as long as `ts.pkl` is located inside the `nvidia` folder, and eight GPUs were used.
-If this isn't the case, select the check box for `data args` and change the `dirs` entry to the directory `ts.pkl` is located, and under `draw args` change `n_gpus` to the number used.
+If `ts.pkl` isn't located inside the `nvidia` folder, and a eight GPUs weren't used, select the check box for `data args` and change the `dirs` entry to the directory `ts.pkl` is located, and under `draw args` change `n_gpus` to the number used.
 You can also zoom in on a few iterations by changing `idx_start` and `idx_end` in the `data args` (e.g., `idx_start`=5 and `idx_end`=10 to view samples 5-9).
 
 4) Click `load data`, then click `redraw plot` once it becomes available.
 
-If you change `data args` you only need to click `load data`. If you only changed `draw args` you only need to click `redraw plot`.
+If you change `data args` you need to click `load data` and `redraw plot`. If you only changed `draw args` you only need to click `redraw plot`.
 
 If you system is suffering from "Lit Silicon", you will observe one GPU consistently has a lower "lead" value than the others.
 
