@@ -1,0 +1,3 @@
+[submodule "chopper"]
+	path = chopper
+	url = https://github.com/UnaryLab/chopper.git
