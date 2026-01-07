@@ -7,7 +7,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --gpus-per-node=8
-#SBATCH --cpus-per-node=96
+#SBATCH --cpus-per-task=96
 #SBATCH --mem=0
 #SBATCH --time=04:00:00
 ##SBATCH --time=36:00:00
@@ -17,7 +17,7 @@ set -ex
 
 cd $SLURM_SUBMIT_DIR
 CONTAINER_HOME=$SLURM_SUBMIT_DIR
-SIF_FILE=pytorch-container.sif
+SIF_FILE=pytorch.sif
 
 ITERS=251
 WAIT=9
@@ -56,6 +56,7 @@ run_job() {
                 --grad_accumlate_pre_steps "$GRAD_ACCUMLATE_PRE_STEPS"
                 --output_dir "${HN}/b${BS}s${CL}"
                 --wait $WAIT
+                --use_fsdp2=1
         )
 
         echo "RUNANDTIME_START $(date +%s)"

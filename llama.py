@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import transformer_engine.pytorch as te
+from torch.profiler import profile, ProfilerActivity, record_function
 
 from pydantic.dataclasses import dataclass
 from flash_attn import flash_attn_func
@@ -16,6 +17,8 @@ class LLaMAConfig:
     vocab_size: int  # V
     eps: float
     hidden_dim: int # K
+    batch_size: int
+    enable_fp8: bool
 
     def estimate_flops_per_token(self, model,bsz):
         head_dim = self.embedding_dim // self.num_heads
@@ -83,25 +86,44 @@ class Attention(nn.Module):
         self.use_sdpa = torch.cuda.is_available() and 'MI3' not in torch.cuda.get_device_name() 
     
     def forward(self,input,position_encoding):
-        qkv = self.in_proj(input)
-        q,k,v = qkv.split([self.embedding_dim, self.kv_dim, self.kv_dim], -1)
-        q = q.unflatten(-1, [-1, self.head_dim]).transpose(1, 2)
-        k = k.unflatten(-1, [-1, self.head_dim]).transpose(1, 2)
-        v = v.unflatten(-1, [-1, self.head_dim]).transpose(1, 2)
-        q, k = apply_rotary_emb(q, k, position_encoding)
+        with record_function("qkv_ip"):
+            qkv = self.in_proj(input)
+            # print(f"qkv_ip--input: {input.shape}")
+            # print(f"qkv_ip--weight: {self.in_proj.weight.shape}")
+            # print(f"qkv_ip--output: {qkv.shape}")
+        with record_function("qkv_s"):
+            q, k, v = qkv.split(
+                [self.embedding_dim, self.kv_dim, self.kv_dim], -1)
+        with record_function("qkv_t"):
+            q = q.unflatten(-1, [-1, self.head_dim]).transpose(1, 2)
+            k = k.unflatten(-1, [-1, self.head_dim]).transpose(1, 2)
+            v = v.unflatten(-1, [-1, self.head_dim]).transpose(1, 2)
+        with record_function("qkv_re"):
+            q, k = apply_rotary_emb(q, k, position_encoding)
 
         
         if self.use_sdpa:
-            k = k.repeat_interleave(self.embedding_dim//self.kv_dim,1)
-            v = v.repeat_interleave(self.embedding_dim//self.kv_dim,1)
-            o = F.scaled_dot_product_attention(q,k,v,dropout_p=0, is_causal=True)
+            with record_function("attn_i"):
+                k = k.repeat_interleave(self.embedding_dim//self.kv_dim,1)
+                v = v.repeat_interleave(self.embedding_dim//self.kv_dim,1)
+            with record_function("attn_sdpa"):
+                o = F.scaled_dot_product_attention(
+                    q, k, v, dropout_p=0, is_causal=True)
         else:
-            q = q.transpose(1, 2).contiguous()
-            k = k.transpose(1, 2).contiguous()
-            v = v.transpose(1, 2).contiguous()
-            o = flash_attn_func(q,k,v,dropout_p=0, causal=True)
+            with record_function("attn_c"):
+                q = q.transpose(1, 2).contiguous()
+                k = k.transpose(1, 2).contiguous()
+                v = v.transpose(1, 2).contiguous()
+            with record_function("attn_fa"):
+                o = flash_attn_func(q, k, v, dropout_p=0, causal=True)
 
-        o = self.out_proj(o.reshape(input.shape))
+        with record_function("attn_or"):
+            o_reshape = o.reshape(input.shape)
+        with record_function("attn_op"):
+            o = self.out_proj(o_reshape)
+            # print(f"attn_op--input: {o_reshape.shape}")
+            # print(f"attn_op--weight: {self.out_proj.weight.shape}")
+            # print(f"attn_op--output: {o.shape}")
         return o
 
 class MLP(nn.Module):
@@ -112,8 +134,25 @@ class MLP(nn.Module):
         self.down_proj = nn.Linear(hidden_dim, embedding_dim, bias=False)
     
     def forward(self,input):
-        hid = F.silu(self.gate_proj(input)) * self.up_proj(input)
-        o = self.down_proj(hid)
+        with record_function("fc_gp"):
+            gp = self.gate_proj(input)
+            # print(f"fc_gp--input: {input.shape}")
+            # print(f"fc_gp--weight: {self.gate_proj.weight.shape}")
+            # print(f"fc_gp--output: {gp.shape}")
+        with record_function("fc_gs"):
+            gpsilu = F.silu(gp)
+        with record_function("fc_up"):
+            up = self.up_proj(input)
+            # print(f"up--input: {input.shape}")
+            # print(f"up--weight: {self.up_proj.weight.shape}")
+            # print(f"up--output: {up.shape}")
+        with record_function("fc_gu"):
+            hid = gpsilu * up
+        with record_function("fc_dp"):
+            o = self.down_proj(hid)
+            # print(f"down--input: {hid.shape}")
+            # print(f"down--weight: {self.down_proj.weight.shape}")
+            # print(f"down--output: {o.shape}")
         return o
 
 class RMSNorm(nn.Module):
@@ -137,8 +176,14 @@ class LLaMABlock(nn.Module):
         self.mlp = MLP(embedding_dim,hidden_dim)
 
     def forward(self,input,position_encoding):
-        hid = input + self.attn(self.attn_norm(input), position_encoding)
-        output = hid + self.mlp(self.mlp_norm(hid))
+        with record_function("attn_n"):
+            attn_norm = self.attn_norm(input)
+        with record_function("attn_ra"):
+            hid = input + self.attn(attn_norm, position_encoding)
+        with record_function("fc_n"):
+            mlp_norm = self.mlp_norm(hid)
+        with record_function("fc_ra"):
+            output = hid + self.mlp(mlp_norm)
         return output
     
 def precompute_freq_cis(dim, max_seq_len):
@@ -150,7 +195,7 @@ def precompute_freq_cis(dim, max_seq_len):
     return torch.polar(torch.ones_like(freqs), freqs)
 
 class LLaMA(nn.Module):
-    def __init__(self,vocab_size,embedding_dim,hidden_dim,num_layers,num_heads,num_kv_heads,max_seq_len,eps):
+    def __init__(self,vocab_size,embedding_dim,hidden_dim,num_layers,num_heads,num_kv_heads,max_seq_len,eps,batch_size,enable_fp8):
         super().__init__()
         self.embedding = nn.Embedding(vocab_size, embedding_dim)
         layers = []
@@ -166,14 +211,22 @@ class LLaMA(nn.Module):
         self.register_buffer('position_encoding', freqs)
 
     def forward(self, idxs, is_first_microbatch):
-        x = self.embedding(idxs)
-        for layer in self.layers:
-            x = layer(x, self.position_encoding)
-        logits = self.lm_head(self.norm(x))
+        with record_function("ie"):
+            x = self.embedding(idxs)
+        for i, layer in enumerate(self.layers):
+            with record_function(f"Layer{i}"):
+                x = layer(x, self.position_encoding)
+        with record_function("ln"):
+            fl_norm = self.norm(x)
+        with record_function("lp"):
+            logits = self.lm_head(fl_norm)
+            # print(f"lp--input: {fl_norm.shape}")
+            # print(f"lp--weight: {self.lm_head.weight.shape}")
+            # print(f"lp--output: {logits.shape}")
         return logits
     
 class Fp8LLaMA(nn.Module):
-    def __init__(self,vocab_size,embedding_dim,hidden_dim,num_layers,num_heads,num_kv_heads,max_seq_len,eps):
+    def __init__(self,vocab_size,embedding_dim,hidden_dim,num_layers,num_heads,num_kv_heads,max_seq_len,eps,batch_size,enable_fp8):
         super().__init__()
         self.embedding = nn.Embedding(vocab_size, embedding_dim)
         layers = []
@@ -186,10 +239,16 @@ class Fp8LLaMA(nn.Module):
         self.register_buffer('position_encoding', position_encoding.to(torch.bfloat16))
 
     def forward(self, idxs, is_first_microbatch):
-        x = self.embedding(idxs)
-        for layer in self.layers:
-            x = layer(x, rotary_pos_emb=self.position_encoding, is_first_microbatch=is_first_microbatch)
-        logits = self.norm_lm_head(x)
+        with record_function("ie"):
+            x = self.embedding(idxs)
+        for i, layer in enumerate(self.layers):
+            with record_function(f"Layer{i}"):
+                x = layer(x, rotary_pos_emb=self.position_encoding, is_first_microbatch=is_first_microbatch)
+        with record_function("lnp"):
+            logits = self.norm_lm_head(x)
+            # print(f"lnp--input: {logits.shape}")
+            # print(f"lnp--weight: {self.norm_lm_head.weight.shape}")
+            # print(f"lnp--output: {logits.shape}")
         return logits
 
 class Fp8LLaMABlock(te.TransformerLayer):

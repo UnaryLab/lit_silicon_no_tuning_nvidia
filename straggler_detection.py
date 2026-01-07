@@ -73,7 +73,7 @@ def merge_traces(pytorch_traces):
 
 
 def leader_value(df, agg=True, use_last=False, use_max=False, use_sum=False):
-    df_compute = df[df['stream'] == 0].copy()
+    df_compute = df[~df['name'].str.startswith('ncclDevKernel')].copy()
     df_compute['_ki'] = (
         df_compute
         .groupby(['gpu', 'name'])
@@ -86,7 +86,7 @@ def leader_value(df, agg=True, use_last=False, use_max=False, use_sum=False):
         .max()
         .rename('straggler_ts')
     )
-    df = (
+    df_ = (
         df_compute
         .merge(
             straggler,
@@ -94,47 +94,49 @@ def leader_value(df, agg=True, use_last=False, use_max=False, use_sum=False):
             how='left'
         )
     )
-    df['lead'] = df['straggler_ts'] - df['ts']
-    df.drop(columns='straggler_ts', inplace=True)
-    df.sort_values(['gpu', 'ts'], inplace=True)
+    df_['lead'] = df_['straggler_ts'] - df_['ts']
+    df_.drop(columns='straggler_ts', inplace=True)
+    df_.sort_values(['gpu', 'ts'], inplace=True)
     if agg:
         if use_sum:
             return (
-                df
+                df_
                 .groupby('gpu')['lead']
                 .sum()
                 .reset_index()
             )
         elif use_max:
             return (
-                df
+                df_
                 .groupby('gpu')['lead']
                 .max()
                 .reset_index()
             )
         elif use_last:
             return (
-                df
+                df_
                 .groupby('gpu')['lead']
                 .last()
                 .reset_index()
             )
+        else:
+            raise ValueError("One needs to be true")
     else:
-        return df[['gpu', 'lead']]
+        return df_[['gpu', 'lead']]
 
 
 def no_overlap(df):
     df = df.copy()
     df['end'] = df['ts'] + df['dur']
 
-    df_compute = df[df['stream'] == 0].copy()
+    df_compute = df[~df['name'].str.startswith('ncclDevKernel')].copy()
     df_compute['_ki'] = (
         df_compute
         .groupby(['gpu', 'name'])
         .cumcount()
     )
 
-    df_overlap = df[df['stream'] != 0].copy()
+    df_overlap = df[df['name'].str.startswith('ncclDevKernel')].copy()
 
     no_overlap = pd.Series(True, index=df_compute.index)
     for _, row_overlap in df_overlap.iterrows():
@@ -187,18 +189,34 @@ def get_straggler_gpus(
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
-    import click
+    from argparse import ArgumentParser
 
-    @click.command()
-    @click.argument('pytorch_traces', nargs=-1, required=True)
+    parser = ArgumentParser()
+    parser.add_argument(
+        "--traces",
+        "-t",
+        action="append",
+        type=str,
+        required=True,
+        nargs="+",
+    )
+    args = parser.parse_args()
+
     def main(
-        pytorch_traces: str,
+        traces: list[list[str]],
     ):
-        df = merge_traces(pytorch_traces)
+        # merge pickle
+        step_dfs = tuple(merge_traces(t) for t in zip(*traces))
+        df = pd.concat(
+            step_dfs[1:],
+            ignore_index=True
+        )
+
+        n_gpus = df['gpu'].nunique()
         lv = leader_value(df, agg=False)
-        lv_sum = leader_value(df, agg=True)
-        assert len(pytorch_traces) == 8, f"I can't be bothered with {
-            len(pytorch_traces)} traces"
+        lv_sum = leader_value(df, agg=True, use_sum=True)
+        assert n_gpus == 8, f"got {
+            len(traces)} traces but expected 8. Comment this out if expected"
 
         n_rows = 2
         n_cols = 4
@@ -263,4 +281,4 @@ if __name__ == "__main__":
             ax1.set_ylim((min_ylim1, max_ylim1))
         fig.tight_layout()
         fig.savefig('straggler_detection.pdf')
-    main()
+    main(args.traces)
