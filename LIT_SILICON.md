@@ -1,4 +1,5 @@
 # Lit Silicon Benchmark & Evaluation (AMD)
+
 > [!NOTE]
 > Artifact in progress...
 
@@ -81,8 +82,7 @@ Now, the pickle file will be inside the directory passed and named `ts.pkl` (e.g
 Copy it any way you'd like, `rsync` is not required.
 
 ```
-mkdir nvidia
-rsync -avzh <login_node>:/data/lit_silicon/hostname/bXsX/ts.pkl nvidia/ts.pkl
+rsync -avzh <login_node>:/data/lit_silicon/hostname/bXsX/ts.pkl .
 ```
 
 2) Open the Chopper GUI
@@ -93,12 +93,12 @@ python -m chopper.window
 
 3) Select `straggler_per_gpu` under `available plots`
 
-If `ts.pkl` isn't located inside the `nvidia` folder, and a eight GPUs weren't used, select the check box for `data args` and change the `dirs` entry to the directory `ts.pkl` is located, and under `draw args` change `n_gpus` to the number used.
-You can also zoom in on a few iterations by changing `idx_start` and `idx_end` in the `data args` (e.g., `idx_start`=5 and `idx_end`=10 to view samples 5-9).
+If `ts.pkl` isn't located inside the current directory, select the check box for `data args` and change the `dirs` entry to the directory `ts.pkl` is located.
+You can also zoom in on a few iterations by changing `idx_start` and `idx_end` in the `draw args` (e.g., `idx_start`=5 and `idx_end`=10 to view samples 5-9).
 
 4) Click `load data`, then click `redraw plot` once it becomes available.
 
-If you change `data args` you need to click `load data` and `redraw plot`. If you only changed `draw args` you only need to click `redraw plot`.
+If you change the `data args` you need to click `load data` and `redraw plot`. If you only changed `draw args` you only need to click `redraw plot` (i.e., you don't need to reload when changing only iterations to view).
 
 If you system is suffering from "Lit Silicon", you will observe one GPU consistently has a lower "lead" value than the others.
 

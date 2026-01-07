@@ -187,98 +187,98 @@ def get_straggler_gpus(
     return lv.set_index('gpu')['freq_inc'].to_dict(), max_lead
 
 
-if __name__ == "__main__":
-    import matplotlib.pyplot as plt
-    from argparse import ArgumentParser
+# if __name__ == "__main__":
+#     import matplotlib.pyplot as plt
+#     from argparse import ArgumentParser
 
-    parser = ArgumentParser()
-    parser.add_argument(
-        "--traces",
-        "-t",
-        action="append",
-        type=str,
-        required=True,
-        nargs="+",
-    )
-    args = parser.parse_args()
+#     parser = ArgumentParser()
+#     parser.add_argument(
+#         "--traces",
+#         "-t",
+#         action="append",
+#         type=str,
+#         required=True,
+#         nargs="+",
+#     )
+#     args = parser.parse_args()
 
-    def main(
-        traces: list[list[str]],
-    ):
-        # merge pickle
-        step_dfs = tuple(merge_traces(t) for t in zip(*traces))
-        df = pd.concat(
-            step_dfs[1:],
-            ignore_index=True
-        )
+#     def main(
+#         traces: list[list[str]],
+#     ):
+#         # merge pickle
+#         step_dfs = tuple(merge_traces(t) for t in zip(*traces))
+#         df = pd.concat(
+#             step_dfs[1:],
+#             ignore_index=True
+#         )
 
-        n_gpus = df['gpu'].nunique()
-        lv = leader_value(df, agg=False)
-        lv_sum = leader_value(df, agg=True, use_sum=True)
-        assert n_gpus == 8, f"got {
-            len(traces)} traces but expected 8. Comment this out if expected"
+#         n_gpus = df['gpu'].nunique()
+#         lv = leader_value(df, agg=False)
+#         lv_sum = leader_value(df, agg=True, use_sum=True)
+#         assert n_gpus == 8, f"got {
+#             len(traces)} traces but expected 8. Comment this out if expected"
 
-        n_rows = 2
-        n_cols = 4
-        fig, axs = plt.subplots(n_rows, n_cols)
-        taxs = np.empty_like(axs, dtype=axs.dtype)
-        for row in range(n_rows):
-            for col in range(n_cols):
-                taxs[row][col] = axs[row][col].twinx()
+#         n_rows = 2
+#         n_cols = 4
+#         fig, axs = plt.subplots(n_rows, n_cols)
+#         taxs = np.empty_like(axs, dtype=axs.dtype)
+#         for row in range(n_rows):
+#             for col in range(n_cols):
+#                 taxs[row][col] = axs[row][col].twinx()
 
-        gpus = lv['gpu'].unique()
-        max_ylim0 = 0
-        min_ylim0 = 0
-        max_ylim1 = 0
-        min_ylim1 = 0
-        for gpu in gpus:
-            lv_mask = lv['gpu'] == gpu
-            lv_sum_mask = lv_sum['gpu'] == gpu
-            ax0 = axs[gpu % 2][gpu//2]
-            ax1 = taxs[gpu % 2][gpu//2]
-            ax0.scatter(
-                lv[lv_mask].reset_index().index,
-                lv.loc[lv_mask, 'lead'],
-                s=.5,
-                color='black',
-            )
-            width = lv[lv_mask].reset_index().index.values[-1]
-            ax1.bar(
-                width/2,
-                lv_sum.loc[lv_sum_mask, 'lead'],
-                width=width,
-                alpha=.5,
-                color='purple',
-            )
-            ax1.set_zorder(0)
-            ax0.set_zorder(1)
-            ax0.patch.set_visible(False)
-            ylim0 = ax0.get_ylim()
-            ylim1 = ax1.get_ylim()
-            min_ylim0 = min(min_ylim0, ylim0[0])
-            max_ylim0 = max(max_ylim0, ylim0[1])
-            min_ylim1 = min(min_ylim1, ylim1[0])
-            max_ylim1 = max(max_ylim1, ylim1[1])
+#         gpus = lv['gpu'].unique()
+#         max_ylim0 = 0
+#         min_ylim0 = 0
+#         max_ylim1 = 0
+#         min_ylim1 = 0
+#         for gpu in gpus:
+#             lv_mask = lv['gpu'] == gpu
+#             lv_sum_mask = lv_sum['gpu'] == gpu
+#             ax0 = axs[gpu % 2][gpu//2]
+#             ax1 = taxs[gpu % 2][gpu//2]
+#             ax0.scatter(
+#                 lv[lv_mask].reset_index().index,
+#                 lv.loc[lv_mask, 'lead'],
+#                 s=.5,
+#                 color='black',
+#             )
+#             width = lv[lv_mask].reset_index().index.values[-1]
+#             ax1.bar(
+#                 width/2,
+#                 lv_sum.loc[lv_sum_mask, 'lead'],
+#                 width=width,
+#                 alpha=.5,
+#                 color='purple',
+#             )
+#             ax1.set_zorder(0)
+#             ax0.set_zorder(1)
+#             ax0.patch.set_visible(False)
+#             ylim0 = ax0.get_ylim()
+#             ylim1 = ax1.get_ylim()
+#             min_ylim0 = min(min_ylim0, ylim0[0])
+#             max_ylim0 = max(max_ylim0, ylim0[1])
+#             min_ylim1 = min(min_ylim1, ylim1[0])
+#             max_ylim1 = max(max_ylim1, ylim1[1])
 
-        for gpu in gpus:
-            ax0 = axs[gpu % 2][gpu//2]
-            ax1 = taxs[gpu % 2][gpu//2]
-            if gpu % 2 == 0:
-                ax0.set_xticklabels([])
-                ax0.tick_params(axis='x', length=0)
-            if gpu // 2 != 0:
-                ax0.set_yticklabels([])
-                ax0.tick_params(axis='y', length=0)
-            else:
-                ax0.set_ylabel('Lead Value')
+#         for gpu in gpus:
+#             ax0 = axs[gpu % 2][gpu//2]
+#             ax1 = taxs[gpu % 2][gpu//2]
+#             if gpu % 2 == 0:
+#                 ax0.set_xticklabels([])
+#                 ax0.tick_params(axis='x', length=0)
+#             if gpu // 2 != 0:
+#                 ax0.set_yticklabels([])
+#                 ax0.tick_params(axis='y', length=0)
+#             else:
+#                 ax0.set_ylabel('Lead Value')
 
-            if gpu // 2 != n_cols-1:
-                ax1.set_yticklabels([])
-                ax1.tick_params(axis='y', length=0)
-            else:
-                ax1.set_ylabel('Lead Sum')
-            ax0.set_ylim((min_ylim0, max_ylim0))
-            ax1.set_ylim((min_ylim1, max_ylim1))
-        fig.tight_layout()
-        fig.savefig('straggler_detection.pdf')
-    main(args.traces)
+#             if gpu // 2 != n_cols-1:
+#                 ax1.set_yticklabels([])
+#                 ax1.tick_params(axis='y', length=0)
+#             else:
+#                 ax1.set_ylabel('Lead Sum')
+#             ax0.set_ylim((min_ylim0, max_ylim0))
+#             ax1.set_ylim((min_ylim1, max_ylim1))
+#         fig.tight_layout()
+#         fig.savefig('straggler_detection.pdf')
+#     main(args.traces)
