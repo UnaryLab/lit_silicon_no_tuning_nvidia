@@ -94,7 +94,7 @@ python -m chopper.window
 3) Select `straggler_per_gpu` under `available plots`
 
 If `ts.pkl` isn't located inside the current directory, select the check box for `data args` and change the `dirs` entry to the directory `ts.pkl` is located.
-You can also zoom in on a few iterations by changing `idx_start` and `idx_end` in the `draw args` (e.g., `idx_start`=5 and `idx_end`=10 to view samples 5-9).
+You can also zoom in on a few iterations by changing `idx_start` and `idx_end` in the `draw args` (e.g., `idx_start=5` and `idx_end=10` to view samples 5-9).
 
 4) Click `load data`, then click `redraw plot` once it becomes available.
 
