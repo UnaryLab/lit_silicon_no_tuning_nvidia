@@ -21,8 +21,8 @@ This will be used for installing Chopper.
 
 ```
 curl -LsSf https://astral.sh/uv/install.sh | sh
-uv venv --python=3.12 --seed ls_venv
-. ls_venv/bin/activate
+uv venv --python=3.12 --seed .ls_venv
+. .ls_venv/bin/activate
 ```
 
 #### python venv
