@@ -44,7 +44,7 @@ cd ..
 2) Build the container **(remote)**
 
 > [!NOTE]
-> While we use apptainer and slurm, docker can also be used since the [apptainer image](./pytorch.def) only installs one additional python package. Adjust the scripts as needed.
+> While we use apptainer and slurm, docker can also be used since the [apptainer image](pytorch.def) only installs one additional python package. Adjust the scripts as needed.
 
 ```
 ./build.sh
@@ -100,7 +100,12 @@ You can also zoom in on a few iterations by changing `idx_start` and `idx_end` i
 
 If you change the `data args` you need to click `load data` and `redraw plot`. If you only changed `draw args` you only need to click `redraw plot` (i.e., you don't need to reload when changing only iterations to view).
 
-If you system is suffering from "Lit Silicon", you will observe one GPU consistently has a lower "lead" value than the others.
+In a system suffering from "Lit Silicon", you will observe one or more GPU consistently has a lower "lead" value than the others:
+
+![Lit Silicon Example](misc/lit_silicon_example.png)
+
+> In the above example, GPU2 is clearly the straggler, GPU6 is close, and other GPUs are leaders that all reach an equilibrium where the lead stops increasing due to increase communication overlap.
+For more details check out [our paper on arxiv](https://arxiv.org/abs/2511.09861)!
 
 ## Cite our paper
 
