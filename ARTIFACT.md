@@ -6,7 +6,7 @@
 # Lit Silicon Benchmark & Evaluation (NVIDIA)
 
 This repo provides an FSDP training benchmark that can be used to detect the "Lit Silicon" effect.
-We are assuming the visualization will be done on a local computer while the benchmark will be ran on a remote node.
+We are assuming the visualization will be done on a local computer while the benchmark will be run on a remote node.
 However, if a GUI is available on the remote node, all steps can be completed there.
 Each step will be annotated with **(local)** or **(remote)** to designate where it should be performed.
 
@@ -16,16 +16,6 @@ Each step will be annotated with **(local)** or **(remote)** to designate where 
 
 Create a python virtual environment if you don't have one already.
 This will be used for installing Chopper.
-
-#### uv (recommended)
-
-```
-curl -LsSf https://astral.sh/uv/install.sh | sh
-uv venv --python=3.12 --seed .ls_venv
-. .ls_venv/bin/activate
-```
-
-#### python venv
 
 ```
 python -m venv .ls_venv
@@ -47,7 +37,7 @@ cd ..
 > While we use apptainer and slurm, docker can also be used since the [apptainer image](pytorch.def) only installs one additional python package. Adjust the scripts as needed.
 
 ```
-./build.sh
+sbatch build_pytorch.sh
 ```
 
 ## Running **(remote)**
@@ -58,7 +48,7 @@ This benchmark will run pytorch FSDPv2 training with batch size one sequence len
 Raw traces will be inside a folder named the hostname, with the batch size and sequence length number as subfolders (e.g., if node `foobar` ran the benchmark, traces are in `foobar/b1s4`, `foobar/b2s4`, and `foobar/b1s8`).
 
 ```
-./run_pytorch.sh
+sbatch run_pytorch.sh
 ```
 
 2) Merge traces using Chopper
@@ -98,24 +88,9 @@ You can also zoom in on a few iterations by changing `idx_start` and `idx_end` i
 
 4) Click `load data`, then click `redraw plot` once it becomes available.
 
-If you change the `data args` you need to click `load data` and `redraw plot`. If you only changed `draw args` you only need to click `redraw plot` (i.e., you don't need to reload when changing only iterations to view).
-
 In a system suffering from "Lit Silicon", you will observe one or more GPU consistently has a lower "lead" value than the others:
 
 ![Lit Silicon Example](misc/lit_silicon_example.png)
 
 > In the above example, GPU2 is clearly the straggler, GPU6 is close, and other GPUs are leaders that all reach an equilibrium where the lead stops increasing due to increase communication overlap.
 For more details check out [our paper on arxiv](https://arxiv.org/abs/2511.09861)!
-
-## Cite our paper
-
-```
-@article{lit_silicon,
-  title={{Lit Silicon: A Case Where Thermal Imbalance Couples Concurrent Execution in Multiple GPUs}},
-  author={Kurzynski, Marco and Aga, Shaizeen and Wu, Di},
-  journal={arXiv preprint arXiv:2511.09861},
-  year={2025}
-}
-```
-
-
