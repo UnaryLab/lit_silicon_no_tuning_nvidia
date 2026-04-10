@@ -1,7 +1,8 @@
 # Lit Silicon Benchmark & Evaluation (AMD)
 
-> [!NOTE]
-> Artifact in progress...
+The AMD artifact also supports tuning power caps, and uses a more optimized AMD training framework, Primus:
+
+[AMD Lit Silicon artifact + tuning](https://github.com/UnaryLab/lit_silicon_tuning_amd)
 
 # Lit Silicon Benchmark & Evaluation (NVIDIA)
 
