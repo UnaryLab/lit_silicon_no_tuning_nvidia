@@ -32,10 +32,25 @@ pip install .
 cd ..
 ```
 
-2) Build the container **(remote)**
+2) Install host-side tuning dependencies **(remote, only needed for `POWER_MAN=1`)**
+
+Power-cap tuning starts `freq_server.py` on the host before launching training inside the container.
+Because that server runs outside `pytorch.sif`, the remote host Python environment needs gRPC installed.
+Install this in the same environment that will run `sbatch run_pytorch.sh`:
+
+```
+pip install grpcio grpcio-tools
+```
+
+The container also needs gRPC and trace parsing dependencies for the training process.
+Those are installed by `pytorch.def` when the image is built.
+
+3) Build the container **(remote)**
 
 > [!NOTE]
-> While we use apptainer and slurm, docker can also be used since the [apptainer image](pytorch.def) only installs one additional python package. Adjust the scripts as needed.
+> While we use apptainer and slurm, docker can also be used. Adjust the scripts as needed.
+
+Build `pytorch.sif` before running the benchmark. `run_pytorch.sh` expects this image to exist.
 
 ```
 sbatch build_pytorch.sh
@@ -47,9 +62,18 @@ sbatch build_pytorch.sh
 
 This benchmark will run pytorch FSDPv2 training with batch size one sequence length 4k (b1s4), b2s4, and b1s8.
 Raw traces will be inside a folder named the hostname, with the batch size and sequence length number as subfolders (e.g., if node `foobar` ran the benchmark, traces are in `foobar/b1s4`, `foobar/b2s4`, and `foobar/b1s8`).
+Make sure the container build step above has completed successfully first.
 
 ```
 sbatch run_pytorch.sh
+```
+
+Power-cap tuning can be enabled with `POWER_MAN=1`.
+This starts `freq_server.py`, exports profiler traces, computes per-GPU cap adjustments from straggler lead, and sends the requested caps to the local gRPC server.
+The server currently contains placeholders for the hardware-specific power/frequency commands, so fill in `set_power` or `set_freq` before expecting real device changes.
+
+```
+ITERS=1200 POWER_MAN=1 INITIAL_POWER_CAP=<TDP for GPU-red> MAX_POWER=<TDP for GPU-red> sbatch run_pytorch.sh
 ```
 
 2) Merge traces using Chopper

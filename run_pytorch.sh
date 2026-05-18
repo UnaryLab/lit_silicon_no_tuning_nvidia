@@ -19,10 +19,32 @@ cd $SLURM_SUBMIT_DIR
 CONTAINER_HOME=$SLURM_SUBMIT_DIR
 SIF_FILE=pytorch.sif
 
-ITERS=251
-WAIT=9
-GRAD_ACCUMLATE_PRE_STEPS=99999
+ITERS="${ITERS:-251}"
+WAIT="${WAIT:-9}"
+ACTIVE="${ACTIVE:-1}"
+GRAD_ACCUMLATE_PRE_STEPS="${GRAD_ACCUMLATE_PRE_STEPS:-99999}"
+POWER_MAN="${POWER_MAN:-0}"
+ADJUST_STEPS="${ADJUST_STEPS:-3}"
+WAIT_STEPS="${WAIT_STEPS:-50}"
+INITIAL_POWER_CAP="${INITIAL_POWER_CAP:-750}"
+POWER_BUDGET="${POWER_BUDGET:-0}"
+REALLOC_POWER="${REALLOC_POWER:-0}"
+MAX_ADJ="${MAX_ADJ:-15}"
+MAX_POWER="${MAX_POWER:-750}"
+USE_SUM="${USE_SUM:-1}"
+USE_LAST="${USE_LAST:-0}"
+USE_MAX="${USE_MAX:-0}"
+USE_GLOBAL="${USE_GLOBAL:-1}"
+GRPC_SOCKET="${GRPC_SOCKET:-/tmp/freq.sock}"
 HN=$(hostname -s)
+
+cleanup() {
+        if [[ -n "${FREQ_SERVER_PID:-}" ]]; then
+                kill "$FREQ_SERVER_PID" 2>/dev/null || true
+                wait "$FREQ_SERVER_PID" 2>/dev/null || true
+        fi
+}
+trap cleanup EXIT
 
 run_job() {
         BS=$1
@@ -37,8 +59,11 @@ run_job() {
         APPTAINER_ARGS=(
                 apptainer exec
                 --nv
-                "${CONTAINER_HOME}/${SIF_FILE}"
         )
+        if [[ "$POWER_MAN" == "1" ]]; then
+                APPTAINER_ARGS+=(--bind "${GRPC_SOCKET}:${GRPC_SOCKET}")
+        fi
+        APPTAINER_ARGS+=("${CONTAINER_HOME}/${SIF_FILE}")
 
 
         TORCHRUN_ARGS=(
@@ -56,6 +81,20 @@ run_job() {
                 --grad_accumlate_pre_steps "$GRAD_ACCUMLATE_PRE_STEPS"
                 --output_dir "${HN}/b${BS}s${CL}"
                 --wait $WAIT
+                --active "$ACTIVE"
+                --power_man "$POWER_MAN"
+                --adjust_steps "$ADJUST_STEPS"
+                --wait_steps "$WAIT_STEPS"
+                --initial_power_cap "$INITIAL_POWER_CAP"
+                --power_budget "$POWER_BUDGET"
+                --realloc_power "$REALLOC_POWER"
+                --max_adj "$MAX_ADJ"
+                --max_power "$MAX_POWER"
+                --use_sum "$USE_SUM"
+                --use_last "$USE_LAST"
+                --use_max "$USE_MAX"
+                --use_global "$USE_GLOBAL"
+                --grpc_socket "$GRPC_SOCKET"
                 --use_fsdp2=1
         )
 
@@ -64,7 +103,12 @@ run_job() {
         echo "RUNANDTIME_STOP $(date +%s)"
 }
 
+if [[ "$POWER_MAN" == "1" ]]; then
+        ./freq_server.py &
+        FREQ_SERVER_PID=$!
+        sleep 3
+fi
+
 run_job 1 4 1
 run_job 2 4 1
 run_job 1 8 1
-
