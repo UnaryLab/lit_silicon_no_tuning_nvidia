@@ -70,10 +70,36 @@ sbatch run_pytorch.sh
 
 Power-cap tuning can be enabled with `POWER_MAN=1`.
 This starts `freq_server.py`, exports profiler traces, computes per-GPU cap adjustments from straggler lead, and sends the requested caps to the local gRPC server.
-The server currently contains placeholders for the hardware-specific power/frequency commands, so fill in `set_power` or `set_freq` before expecting real device changes.
+The server sets power caps with `sudo nvidia-smi -i <gpu> -pl <power cap>`.
+The default initial and maximum power cap is 700 W, which is suitable for H100 SXM-class systems but should be overridden for lower-TDP GPUs such as H100 PCIe.
 
 ```
-ITERS=1200 POWER_MAN=1 INITIAL_POWER_CAP=<TDP for GPU-red> MAX_POWER=<TDP for GPU-red> sbatch run_pytorch.sh
+ITERS=1200 POWER_MAN=1 sbatch run_pytorch.sh
+```
+
+The tuning experiments use three power-management scenarios.
+For H100 SXM systems, use these environment variable sets:
+The total node power budget is always `(INITIAL_POWER_CAP + POWER_BUDGET) * number_of_gpus`, while `MAX_POWER` is the hard per-GPU cap.
+
+**GPU-Red** starts every GPU at the maximum 700 W cap.
+The power manager can then reduce power on leader GPUs while leaving the straggler near the maximum.
+
+```
+ITERS=1200 POWER_MAN=1 INITIAL_POWER_CAP=700 MAX_POWER=700 POWER_BUDGET=0 sbatch run_pytorch.sh
+```
+
+**GPU-Realloc** starts every GPU 100 W below the maximum, at 600 W.
+The power manager can reallocate within the 700 W per-GPU maximum, so the straggler can receive more power while leaders are reduced.
+
+```
+ITERS=1200 POWER_MAN=1 INITIAL_POWER_CAP=600 MAX_POWER=700 POWER_BUDGET=0 sbatch run_pytorch.sh
+```
+
+**CPU-Slosh** starts every GPU at 600 W and adds a 20 W per-GPU budget.
+This lets each GPU rise as high as 620 W in aggregate budget terms, so the straggler can receive extra power while leaders give power back.
+
+```
+ITERS=1200 POWER_MAN=1 INITIAL_POWER_CAP=600 MAX_POWER=700 POWER_BUDGET=20 sbatch run_pytorch.sh
 ```
 
 2) Merge traces using Chopper

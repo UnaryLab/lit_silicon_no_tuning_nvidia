@@ -3,14 +3,7 @@ syntax = "proto3";
 package freq;
 
 service FreqServer {
-  rpc SetFreq(FreqReq) returns (FreqAck) {}
   rpc SetPower(PowerReq) returns (FreqAck) {}
-}
-
-message FreqReq {
-  int32 gpu = 1;
-  int32 freq = 2;
-  bool max = 3;
 }
 
 message PowerReq {

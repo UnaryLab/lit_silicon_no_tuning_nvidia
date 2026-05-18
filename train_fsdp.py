@@ -78,7 +78,6 @@ class PowerTuner:
         wait_steps: int,
         initial_power_cap: int,
         power_budget: int,
-        realloc_power: bool,
         max_adj: int,
         use_sum: bool,
         use_last: bool,
@@ -101,7 +100,7 @@ class PowerTuner:
         self.use_global = use_global
         self.grpc_socket = grpc_socket
         self.max_power = max_power
-        self.fake_max_power = initial_power_cap + power_budget if realloc_power else max_power
+        self.fake_max_power = initial_power_cap + power_budget
         self.gpu_power = [initial_power_cap for _ in range(world_size)]
         self.gpu_pending = [[] for _ in range(world_size)]
 
@@ -296,11 +295,10 @@ def train(
     power_man: bool = False,
     adjust_steps: int = 3,
     wait_steps: int = 50,
-    initial_power_cap: int = 750,
+    initial_power_cap: int = 700,
     power_budget: int = 0,
-    realloc_power: bool = False,
     max_adj: int = 15,
-    max_power: int = 750,
+    max_power: int = 700,
     use_sum: bool = True,
     use_last: bool = False,
     use_max: bool = False,
@@ -328,7 +326,6 @@ def train(
                 wait_steps=wait_steps,
                 initial_power_cap=initial_power_cap,
                 power_budget=power_budget,
-                realloc_power=realloc_power,
                 max_adj=max_adj,
                 max_power=max_power,
                 use_sum=use_sum,
