@@ -7,7 +7,6 @@ from dataclasses import asdict
 from contextlib import nullcontext
 from llama import LLaMAConfig, LLaMA, LLaMABlock, Fp8LLaMA, Fp8LLaMABlock
 from mistral import MistralConfig, Mistral, MistralBlock, Fp8Mistral, Fp8MistralBlock
-import itertools
 import math
 from collections.abc import Iterable
 
@@ -421,25 +420,24 @@ def _train(
     enable_fp8 = model_config.enable_fp8
 
     if use_fsdp2:
-        with torch.device('meta'):
-            if enable_fp8:  # add more model
-                enable_compile = False
-                if rank == 0:
-                    print(
-                        'PyTorch compile currently doesn\'t work with Transformer Engine.')
-                if model_name == "llama":
-                    layer_class = Fp8LLaMABlock
-                    model = Fp8LLaMA(**asdict(model_config))
-                elif model_name == "mistral":
-                    layer_class = Fp8MistralBlock
-                    model = Fp8Mistral(**asdict(model_config))
-            else:
-                if model_name == "llama":
-                    layer_class = LLaMABlock
-                    model = LLaMA(**asdict(model_config))
-                elif model_name == "mistral":
-                    layer_class = MistralBlock
-                    model = Mistral(**asdict(model_config))
+        if enable_fp8:  # add more model
+            enable_compile = False
+            if rank == 0:
+                print(
+                    'PyTorch compile currently doesn\'t work with Transformer Engine.')
+            if model_name == "llama":
+                layer_class = Fp8LLaMABlock
+                model = Fp8LLaMA(**asdict(model_config))
+            elif model_name == "mistral":
+                layer_class = Fp8MistralBlock
+                model = Fp8Mistral(**asdict(model_config))
+        else:
+            if model_name == "llama":
+                layer_class = LLaMABlock
+                model = LLaMA(**asdict(model_config))
+            elif model_name == "mistral":
+                layer_class = MistralBlock
+                model = Mistral(**asdict(model_config))
     else:
         if enable_fp8:  # add more model
             enable_compile = False
@@ -480,9 +478,7 @@ def _train(
                 fully_shard(module, **fsdp_kwargs)
 
         fully_shard(model, **fsdp_kwargs)
-        for tensor in itertools.chain(model.parameters(), model.buffers()):
-            assert tensor.device == torch.device("meta")
-        model.to_empty(device='cuda')
+        model.to(device='cuda')
     else:
         model = FSDP(
             model,
